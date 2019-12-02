@@ -70,21 +70,32 @@ func GenerateHelmTemplate(name string, namespace string, valueFileName string, c
 	// }
 
 	// 4. prepare the arguments
+	cmd := exec.Command("bash", "-c", "helm version --short")
+	log.Debugf("Exec bash -c %v", "helm version --short")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return templateFileName, fmt.Errorf("failed to exec comand 'helm version',reason: %v", err)
+	}
+
 	args := []string{binary, "template", "-f", valueFileName,
 		"--namespace", namespace,
 		"--name", name, chartName, ">", templateFileName}
-
-	log.Debugf("Exec bash -c %v", args)
+	cmdString := strings.Join(args, " ")
+	// if helm version is v3,delete --name,because v3 no option --name
+	if !strings.Contains(string(out), "Client:") {
+		cmdString = strings.ReplaceAll(cmdString, " --name ", "  ")
+	}
+	log.Debugf("Exec bash -c %v", cmdString)
 
 	// return syscall.Exec(cmd, args, env)
 	// 5. execute the command
-	log.Debugf("Generating template  %v", args)
-	cmd := exec.Command("bash", "-c", strings.Join(args, " "))
+	log.Debugf("Generating template  %v", cmdString)
+	cmd = exec.Command("bash", "-c", cmdString)
 	// cmd.Env = env
-	out, err := cmd.CombinedOutput()
+	out, err = cmd.CombinedOutput()
 	fmt.Printf("%s", string(out))
 	if err != nil {
-		return templateFileName, fmt.Errorf("Failed to execute %s, %v with %v", binary, args, err)
+		return templateFileName, fmt.Errorf("Failed to execute %s, %v with %v", binary, cmdString, err)
 	}
 
 	// // 6. clean up the value file if needed
